@@ -1,0 +1,29 @@
+#!ipxe
+
+set dhcp-try-counter:int32 0
+
+# Try to use existing dhcp settings
+ifopen
+
+:try-boot
+# Check if we can reach different subnets and resolve domain names
+# If we're missing an option, loop dhcp
+isset ${ip} || goto try-dhcp
+isset ${netmask} || goto try-dhcp
+isset ${gateway} || goto try-dhcp
+isset ${dns} || goto try-dhcp
+
+# We set DHCP option 131 as an encapsulated option space
+# iPXE only supports custom options between 128 and 135
+isset ${131.1:string} || goto try-dhcp
+# TODO: replace example.com
+chain https://${131.1:string}.example.com/boot/ipxe/boot.ipxe
+
+:try-dhcp
+# Only try dhcp 5 times and do not continue otherwise
+# This prevents locking a machine in this script when we reboot it remotely
+# into iPXE
+inc dhcp-try-counter
+iseq ${dhcp-try-counter} 6 && reboot ||
+dhcp || goto try-dhcp
+goto try-boot
